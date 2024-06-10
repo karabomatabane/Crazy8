@@ -4,8 +4,8 @@ namespace Crazy8.Models;
 
 public class Card
 {
-    public string Suit { get; set; }
-    public string Rank { get; set; }
+    public string Suit { get; init; }
+    public string Rank { get; init; }
     public IEffect? Effect { get; set; }
 
     public void Flip()

@@ -2,7 +2,14 @@
 
 namespace Crazy8.Contracts;
 
+public enum EffectFrequency
+{
+    SingleTurn,
+    WholeRound,
+    Persistent
+}
 public interface IEffect
 {
+    EffectFrequency Frequency { get; }
     void Execute(Game game);
 }

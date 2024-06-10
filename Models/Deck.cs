@@ -1,36 +1,76 @@
-﻿namespace Crazy8.Models;
+﻿using Crazy8.Constants;
+
+namespace Crazy8.Models;
 
 public class Deck
 {
     private List<Card> FaceDown { get; set; }
     public List<Card> FaceUp { get; set; }
-    
-    string[] suits = { "Hearts", "Diamonds", "Clubs", "Spades" };
-    string[] ranks = { "2", "3", "4", "5", "6", "7", "8", "9", "10", 
-        "Jack", "Queen", "King", "Ace" };
+    private static Random random = new Random(); 
 
     public Deck(int size = 52)
     {
         FaceDown = new List<Card>();
         FaceUp = new List<Card>();
-        foreach (string suit in suits)
+        foreach (string suit in Const.Suits)
         {
-            Card card = new() { Suit = suit };
-            foreach (string rank in ranks)
+            foreach (string rank in Const.Ranks)
             {
-                card.Rank = rank;
-                FaceDown.Add(card);
+                FaceDown.Add(new Card(){Suit = suit, Rank = rank});
             }
         }
     }
 
     public void Shuffle()
     {
-        // TODO: join the two piles and shuffle them
+        // Fisher–Yates shuffle
+        int n = FaceDown.Count;
+        while (n > 1) {  
+            n--;  
+            int k = random.Next(n + 1);  
+            // val at pos n becomes value at pos n and vice-versa
+            (FaceDown[k], FaceDown[n]) = (FaceDown[n], FaceDown[k]);
+        }
+    }
+
+    public void TurnCard()
+    {
+        if (FaceDown.Count > 0)
+        {
+            FaceUp.Add(FaceDown[0]);
+            FaceDown.RemoveAt(0);
+        }
+        else
+        { 
+            // take all the face up cards except the last one
+            FaceDown = FaceUp.Take(FaceUp.Count - 1).ToList();
+            // shuffle the deck
+            Shuffle();
+        }
+    }
+
+    public void AddCard(Card card)
+    {
+        if (FaceDown.Contains(card) || FaceUp.Contains(card))
+        {
+            throw new Exception("You cannot have a card that already exists in the deck!\nPanic!!!");
+        }
+        FaceUp.Add(card);
     }
 
     public Card[] DealCards(int count)
     {
-        return FaceDown.Take(count).ToArray();
+        Card[] cards = FaceDown.Take(count).ToArray();
+        FaceDown.RemoveRange(0, count);
+        return cards;
+    }
+
+    public void Reset()
+    {
+        foreach (Card card in FaceUp.ToList())
+        {
+            FaceDown.Add(card);
+            FaceUp.Remove(card);
+        }
     }
 }

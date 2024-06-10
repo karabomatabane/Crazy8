@@ -12,8 +12,8 @@ public class Card
         //TODO: flips the card face up
     }
 
-    public void ApplyEffect(IEffect effect)
+    public void ApplyEffect()
     {
-        effect.Execute();
+        // effect.Execute();
     }
 }

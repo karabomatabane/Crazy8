@@ -31,7 +31,6 @@ public class CallEffect : IEffect
 
     private string PromptPlayerForSuit(string defaultSuit)
     {
-        // TODO: ask player to select a suit
         Console.WriteLine($"Pick a suit:\n0. Hearts\n1. Diamonds\n2. Clubs\n3. Spades\nPress 'Enter' " +
                           $"to select default: {defaultSuit}");
         Console.Write("Choice (0-3): ");

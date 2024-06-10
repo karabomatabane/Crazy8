@@ -12,6 +12,8 @@ public class Game
     public int Step { get; set; } = 1; // default step is 1 
     public bool Clockwise { get; set; } = true; // default direction is clockwise
     private List<IEffect?> ActiveEffects { get; set; } // list of active effects
+    private List<Player> Bench { get; set; }
+    private List<Player> Out { get; set; }
     private Dictionary<string, IEffect?> SpecialCards { get; set; }
     public string? RequiredSuit { get; set; }
 
@@ -23,10 +25,17 @@ public class Game
         Round = 0;
         TotalRounds = Players.Length - 1;
         ActiveEffects = new List<IEffect?>();
+        Bench = new List<Player>();
+        Out = new List<Player>();
     }
 
-    public void StartGame()
+    public void StartGame(int round = 1)
     {
+        if (round > 1)
+        {
+            Players = Bench.ToArray();
+            Bench = new List<Player>();
+        }
         Deck.Shuffle();
         DealCards(5);
         while (true)
@@ -48,21 +57,53 @@ public class Game
                 break;
             }
         }
-        Round = 1;
+        Round = round;
     }
 
-    public void ProgressGame(Card playerChoice)
+    public void ProgressGame(Card? playerChoice)
     {
         /*    Manages the turn-based logic of the game, allowing each player to take their turn.
               Applies any special card effects if a special card is played.
              Checks game conditions (e.g., if a player has exhausted all their cards).
              Determines if the round has ended and prepares for the next round if needed.*/
+        Player currentPlayer = Players[Turn];
+        if (playerChoice == null)
+        {
+            currentPlayer.PickCards(Deck, 1);
+            SetNext();
+            Console.Clear();
+            return;
+        }
+
+        Card? faceUp = GetFaceUp();
+        if (faceUp == null) return;
+        bool isValidMove = (SpecialCards.TryGetValue(playerChoice.Rank, out IEffect? effect) && effect != null) || //special
+                           RequiredSuit == playerChoice.Suit || // matches required
+                           string.IsNullOrEmpty(RequiredSuit) && (playerChoice.Suit == faceUp.Suit || playerChoice.Rank //matches face up
+            == faceUp.Rank);
+        if (!isValidMove)
+        {
+            currentPlayer.PickCards(Deck, 2);
+        }
+        else if (!string.IsNullOrEmpty(RequiredSuit)) RequiredSuit = string.Empty;
         Deck.AddCard(playerChoice);
         ApplySpecialCard(playerChoice.Rank);
         SetNext();
-        if (!Players[Turn].HasCards()) Round++;
-        if (Round >= TotalRounds)
-            EndGame();
+        if (!currentPlayer.HasCards())
+        {
+            Bench.Add(currentPlayer);
+            List<Player> temp = new(Players);
+            temp.Remove(currentPlayer);
+            Players = temp.ToArray();
+            if (Players.Length == 1)
+            {
+                Out.Add(Players[0]);
+                Round++;
+                if (Round >= TotalRounds)
+                    EndGame();
+                StartGame(Round);
+            }
+        }
         Console.Clear();
     }
 
@@ -73,7 +114,13 @@ public class Game
 
     private void EndGame()
     {
-        // TODO: End the game
+        Console.WriteLine($"THE GAME HAS ENDED!\nWINNER: {Players[0]}");
+        for (int i = 0; i < Out.Count; i++)
+        {
+            Console.WriteLine($"Rank: {i + 2} => {Out[i]}");
+        }
+
+        Console.WriteLine("THANK YOU FOR PLAYING!!");
     }
 
     private void DealCards(int count)

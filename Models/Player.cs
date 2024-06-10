@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Crazy8.Utils;
 
 namespace Crazy8.Models;
 
@@ -11,17 +12,29 @@ public class Player
     }
 
     public string PlayerId { get; set; }
-    public string Name { get; set; }
+    private string Name { get; set; }
     public Card[]? Hand { get; set; }
 
-    public void PlayCard(Card choice)
+    public Card? PlayCard()
     {
-        // TODO: play card
+        if (Hand == null) return null;
+        Console.WriteLine($"{Name}'s turn\n====================\nPick card from:\n" +
+                          Utility.ListCards(Hand) + "\n====================");
+        Console.Write("Your choice: ");
+        return int.TryParse(Console.ReadLine(), out int choice) ? Hand[choice] : null;
     }
 
-    public void PickCard()
+    public void PickCards(Deck deck, int numCards)
     {
-        // TODO: pick card from deck
+        Card[]? playerHand = Hand;
+        playerHand ??= Array.Empty<Card>(); //if hand is null, initialise as empty array.
+        int n = playerHand.Length;
+        Array.Resize(ref playerHand, n + numCards);
+        Hand = playerHand;
+        for (int i = 0; i < numCards; i++)
+        {
+            Hand[n + i] = deck.DealCards(1)[0];
+        }
     }
 
     public bool HasCards()

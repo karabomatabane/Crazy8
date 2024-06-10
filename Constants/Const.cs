@@ -1,6 +1,6 @@
 ﻿namespace Crazy8.Constants;
 
-public class Const
+public static class Const
 {
     public static readonly string[] Suits = { "Hearts", "Diamonds", "Clubs", "Spades" };
 

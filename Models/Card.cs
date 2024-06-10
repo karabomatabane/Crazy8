@@ -6,14 +6,15 @@ public class Card
 {
     public string Suit { get; set; }
     public string Rank { get; set; }
+    public IEffect? Effect { get; set; }
 
     public void Flip()
     {
         //TODO: flips the card face up
     }
 
-    public void ApplyEffect()
+    public void ApplyEffect(Game game)
     {
-        // effect.Execute();
+        Effect?.Execute(game);
     }
 }

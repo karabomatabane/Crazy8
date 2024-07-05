@@ -16,6 +16,7 @@ public class Game
     private List<Player> Out { get; set; }
     private Dictionary<string, IEffect?> SpecialCards { get; set; }
     public string? RequiredSuit { get; set; }
+    private bool pivot = false;
 
     public Game(Player[] players, Dictionary<string, IEffect?> specialCards)
     {
@@ -86,8 +87,15 @@ public class Game
             currentPlayer.PickCards(Deck, 2);
         }
         else if (!string.IsNullOrEmpty(RequiredSuit)) RequiredSuit = string.Empty;
-        Deck.AddCard(playerChoice);
-        ApplySpecialCard(playerChoice.Rank);
+        if (isValidMove)
+        {
+            Deck.AddCard(playerChoice);
+            if (currentPlayer.Hand == null)
+                return;// TODO: handle exception
+            Card[] playerCards = currentPlayer.Hand.Where(card => card != playerChoice).ToArray();
+            Players[Turn].Hand = playerCards;
+            ApplySpecialCard(playerChoice.Rank);
+        }
         SetNext();
         if (!currentPlayer.HasCards())
         {
@@ -114,10 +122,10 @@ public class Game
 
     private void EndGame()
     {
-        Console.WriteLine($"THE GAME HAS ENDED!\nWINNER: {Players[0]}");
+        Console.WriteLine($"THE GAME HAS ENDED!\nWINNER: {Players[0].Name}");
         for (int i = 0; i < Out.Count; i++)
         {
-            Console.WriteLine($"Rank: {i + 2} => {Out[i]}");
+            Console.WriteLine($"Rank: {i + 2} => {Out[i].Name}");
         }
 
         Console.WriteLine("THANK YOU FOR PLAYING!!");
@@ -130,11 +138,21 @@ public class Game
             player.Hand = Deck.DealCards(count);
         }
     }
+    
+    private void DealCards(string[] ranks)
+    {
+        foreach (Player player in Players)
+        {
+            player.Hand = Deck.DealCards(ranks);
+        }
+    }
 
     private void ApplySpecialCard(string cardRank)
     {
+        bool directionBefore = Clockwise;
         if (!SpecialCards.TryGetValue(cardRank, out IEffect? effect) || effect == null) return;
         effect.Execute(this);
+        pivot = directionBefore != Clockwise;
             
         // Add effect to active effects if not single-turn
         if (effect.Frequency != EffectFrequency.SingleTurn)
@@ -145,7 +163,12 @@ public class Game
 
     private void SetNext()
     {
-        int n = Players.Length - 1;
+        int n = Players.Length;
+        if (n == 2 && pivot)
+        {
+            pivot = false;
+            return;
+        }
         if (Clockwise)
         {
             Turn = (Turn + Step + n) % n;
@@ -154,8 +177,8 @@ public class Game
         {
             Turn = (Turn + n - Step) % n;
         }
-        
         // reset to default
         Step = 1;
+        pivot = false;
     }
 }

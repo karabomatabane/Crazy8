@@ -21,6 +21,9 @@ public class Deck
         }
     }
 
+    /// <summary>
+    /// Shuffle the face-down cards
+    /// </summary>
     public void Shuffle()
     {
         // Fisher–Yates shuffle
@@ -46,6 +49,7 @@ public class Deck
             FaceDown = FaceUp.Take(FaceUp.Count - 1).ToList();
             // shuffle the deck
             Shuffle();
+            TurnCard();
         }
     }
 
@@ -58,13 +62,42 @@ public class Deck
         FaceUp.Add(card);
     }
 
+    /// <summary>
+    /// Deal cards from deck
+    /// </summary>
+    /// <param name="count">Number of cards to deal</param>
+    /// <returns>Array of cards <see cref="Card"/></returns>
     public Card[] DealCards(int count)
     {
         Card[] cards = FaceDown.Take(count).ToArray();
         FaceDown.RemoveRange(0, count);
         return cards;
     }
+    
+    /// <summary>
+    /// Deal specific cards
+    /// </summary>
+    /// <param name="ranks">Array of ranks required</param>
+    /// <returns></returns>
+    public Card[] DealCards(string[] ranks)
+    {
+        return ranks.Select(rank => GetCard(rank)!).ToArray();
+    }
 
+    private Card? GetCard(string rank)
+    {
+        Card? card = FaceDown.FirstOrDefault(card => card.Rank == rank);
+        int position = card != null ? FaceDown.IndexOf(card) : -1;
+        if (position != -1)
+        {
+            FaceDown.RemoveAt(position);
+        }
+        return card;
+    }
+
+    /// <summary>
+    /// Turn all the face-up cards face down 
+    /// </summary>
     public void Reset()
     {
         foreach (Card card in FaceUp.ToList())

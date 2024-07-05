@@ -20,13 +20,13 @@ class Program
 
         Game game = new(players, specialCards);
         game.StartGame();
-        while (game.Round < game.TotalRounds)
+        while (game.Round <= game.TotalRounds)
         {
             // ask player what card they want to play
             Player currentPlayer = players[game.Turn];
             Card? faceUp = game.GetFaceUp();
             if (faceUp == null) continue;
-            string sFaceUp = game.RequiredSuit ?? $"{faceUp.Rank} of {faceUp.Suit}";
+            string sFaceUp = string.IsNullOrEmpty(game.RequiredSuit) ? $"{faceUp.Rank} of {faceUp.Suit}" : game.RequiredSuit;
             Console.WriteLine($"Face up card is: {sFaceUp}");
             game.ProgressGame(currentPlayer.PlayCard());
         }

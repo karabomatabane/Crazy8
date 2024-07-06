@@ -14,9 +14,10 @@ public class Game
     private List<IEffect?> ActiveEffects { get; set; } // list of active effects
     private List<Player> Bench { get; set; }
     private List<Player> Out { get; set; }
+    public int Attacks { get; set; }
     private Dictionary<string, IEffect?> SpecialCards { get; set; }
     public string? RequiredSuit { get; set; }
-    private bool pivot = false;
+    private bool _pivot = false;
 
     public Game(Player[] players, Dictionary<string, IEffect?> specialCards)
     {
@@ -35,10 +36,10 @@ public class Game
         if (round > 1)
         {
             Players = Bench.ToArray();
-            Bench = new List<Player>();
+            Bench = [];
         }
         Deck.Shuffle();
-        DealCards(5);
+        DealCards(["8", "7", "Jack", "2", "Joker"]);
         while (true)
         {
             Deck.TurnCard();
@@ -78,11 +79,20 @@ public class Game
 
         Card? faceUp = GetFaceUp();
         if (faceUp == null) return;
-        bool isValidMove = (SpecialCards.TryGetValue(playerChoice.Rank, out IEffect? effect) && effect != null) || //special
+        bool isValidMove = (SpecialCards.TryGetValue(playerChoice.Rank, out IEffect? cardEffect) && cardEffect != null) || //special
                            RequiredSuit == playerChoice.Suit || // matches required
                            string.IsNullOrEmpty(RequiredSuit) && (playerChoice.Suit == faceUp.Suit || playerChoice.Rank //matches face up
             == faceUp.Rank);
-        if (!isValidMove)
+        if (Attacks > 0)
+        {
+            if (cardEffect is not AttackEffect)
+            {
+                isValidMove = false;
+                currentPlayer.PickCards(Deck, 2 * Attacks);
+                Attacks = 0;
+            }
+        }
+        else if (!isValidMove)
         {
             currentPlayer.PickCards(Deck, 2);
         }
@@ -152,7 +162,7 @@ public class Game
         bool directionBefore = Clockwise;
         if (!SpecialCards.TryGetValue(cardRank, out IEffect? effect) || effect == null) return;
         effect.Execute(this);
-        pivot = directionBefore != Clockwise;
+        _pivot = directionBefore != Clockwise;
             
         // Add effect to active effects if not single-turn
         if (effect.Frequency != EffectFrequency.SingleTurn)
@@ -164,9 +174,9 @@ public class Game
     private void SetNext()
     {
         int n = Players.Length;
-        if (n == 2 && pivot)
+        if (n == 2 && _pivot)
         {
-            pivot = false;
+            _pivot = false;
             return;
         }
         if (Clockwise)
@@ -179,6 +189,6 @@ public class Game
         }
         // reset to default
         Step = 1;
-        pivot = false;
+        _pivot = false;
     }
 }

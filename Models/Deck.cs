@@ -19,6 +19,8 @@ public class Deck
                 FaceDown.Add(new Card(){Suit = suit, Rank = rank});
             }
         }
+        FaceDown.Add(new Card(){Suit = "Red", Rank = "Joker"});
+        FaceDown.Add(new Card(){Suit = "Black", Rank = "Joker"});
     }
 
     /// <summary>

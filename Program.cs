@@ -9,13 +9,12 @@ class Program
     {
         Player[] players = new[]
         {
-            new Player("Tshiamo"), new Player("Karabo"), new Player("Oratile"), 
-            new Player("Fentse"),
-            new Player("Thabi")
+            new Player("Tshiamo"), new Player("Karabo")
         };
         Dictionary<string, IEffect?> specialCards = new()
         {
-            { "7", new JumpEffect() }, { "8", new CallEffect() }, { "Jack", new ReverseEffect() }
+            { "7", new JumpEffect() }, { "8", new CallEffect() }, { "Jack", new ReverseEffect() },
+            { "2", new AttackEffect() { Magnitude = 1 } }, { "Joker", new AttackEffect() { Magnitude = 2 } }
         };
 
         Game game = new(players, specialCards);
@@ -26,7 +25,9 @@ class Program
             Player currentPlayer = players[game.Turn];
             Card? faceUp = game.GetFaceUp();
             if (faceUp == null) continue;
-            string sFaceUp = string.IsNullOrEmpty(game.RequiredSuit) ? $"{faceUp.Rank} of {faceUp.Suit}" : game.RequiredSuit;
+            string sFaceUp = string.IsNullOrEmpty(game.RequiredSuit)
+                ? $"{faceUp.Rank} of {faceUp.Suit}"
+                : game.RequiredSuit;
             Console.WriteLine($"Face up card is: {sFaceUp}");
             game.ProgressGame(currentPlayer.PlayCard());
         }

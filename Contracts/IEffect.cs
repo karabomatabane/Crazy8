@@ -8,8 +8,15 @@ public enum EffectFrequency
     WholeRound,
     Persistent
 }
+
+public enum EffectType
+{
+    Attack,
+    Transformation
+}
 public interface IEffect
 {
     EffectFrequency Frequency { get; }
+    EffectType Type { get; }
     void Execute(Game game);
 }

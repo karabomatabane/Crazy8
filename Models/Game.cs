@@ -4,113 +4,180 @@ namespace Crazy8.Models;
 
 public class Game
 {
-    private Player[] Players { get; set; }
-    private Deck Deck { get; set; }
-    public int Round { get; private set; }
+     /// <summary>
+    /// Event triggered when the face-up card changes
+    /// </summary>
+    public event Action<Card>? FaceUpCardChanged;
+    
+    /// <summary>
+    /// Event triggered when the current player's turn changes
+    /// </summary>
+    public event Action<string>? PlayerTurnChanged;
+    
+    /// <summary>
+    /// Event triggered when the game ends
+    /// </summary>
+    public event Action<List<Player>>? GameHasEnded;
+    
+    /// <summary>
+    /// Unique identifier for the game session
+    /// </summary>
+    public string GameId { get; private set; }
+    
+    /// <summary>
+    /// Array of currently active players in the game
+    /// </summary>
+    public Player[] Players { get; private set; }
+    
+    /// <summary>
+    /// Player ID of the game owner/creator
+    /// </summary>
+    public string Owner { get; set; }
+    
+    /// <summary>
+    /// The deck of cards used in the game
+    /// </summary>
+    public Deck Deck { get; set; }
+    
+    /// <summary>
+    /// Current round number
+    /// </summary>
+    public int Round { get; set; }
+    
+    /// <summary>
+    /// Total number of rounds to be played
+    /// </summary>
     public int TotalRounds { get; }
+    
+    /// <summary>
+    /// Index of the player whose turn it currently is
+    /// </summary>
     public int Turn { get; private set; }
-    public int Step { get; set; } = 1; // default step is 1 
+    
+    /// <summary>
+    /// Number of positions to advance on each turn
+    /// </summary>
+    public int Step { get; set; } = 1; // default step is 1
+    
+    /// <summary>
+    /// Direction of play (true for clockwise, false for counter-clockwise)
+    /// </summary>
     public bool Clockwise { get; set; } = true; // default direction is clockwise
-    private List<IEffect?> ActiveEffects { get; set; } // list of active effects
+    
+    /// <summary>
+    /// Players who have finished their cards for the current round
+    /// </summary>
     private List<Player> Bench { get; set; }
+    
+    /// <summary>
+    /// Players who are out of the game completely
+    /// </summary>
     private List<Player> Out { get; set; }
+    
+    /// <summary>
+    /// Number of accumulated attack points that next player must respond to or draw cards
+    /// </summary>
     public int Attacks { get; set; }
+    
+    /// <summary>
+    /// Dictionary mapping card ranks to their special effects
+    /// </summary>
     private Dictionary<string, IEffect?> SpecialCards { get; set; }
+    
+    /// <summary>
+    /// Suit that must be played in the next turn (e.g., after playing an 8)
+    /// </summary>
     public string? RequiredSuit { get; set; }
-    private bool _pivot = false;
+    
+    /// <summary>
+    /// Indicates whether the game is currently in progress
+    /// </summary>
+    public bool IsRunning { get; private set; }
+    
+    /// <summary>
+    /// Flag to handle special case in direction change for 2-player games
+    /// </summary>
+    private bool _pivot;
+
+    private readonly int _deckSize = 54;
+
+    public Game(Player owner, Dictionary<string, IEffect?> specialCards)
+    {
+        GameId = Guid.NewGuid().ToString();
+        Players = new[] { owner };
+        Owner = owner.PlayerId;
+        SpecialCards = specialCards;
+        Round = 0;
+        TotalRounds = Players.Length - 1;
+        Bench = new List<Player>();
+        Out = new List<Player>();
+        Deck = new Deck(_deckSize);
+    }
 
     public Game(Player[] players, Dictionary<string, IEffect?> specialCards)
     {
+        GameId = Guid.NewGuid().ToString();
         Players = players;
+        Owner = players[0].PlayerId;
         SpecialCards = specialCards;
-        Deck = new Deck();
         Round = 0;
         TotalRounds = Players.Length - 1;
-        ActiveEffects = new List<IEffect?>();
         Bench = new List<Player>();
         Out = new List<Player>();
+        Deck = new Deck(_deckSize);
     }
 
     public void StartGame(int round = 1)
     {
+        IsRunning = true;
+        if (Players.Length < 2) return;
         if (round > 1)
         {
             Players = Bench.ToArray();
             Bench = [];
         }
+
+        if (Deck.GetCount() != _deckSize) 
+        {
+            Deck = new Deck(_deckSize);
+        }
+
         Deck.Shuffle();
-        DealCards(["8", "7", "Jack", "2", "Joker"]);
+        DealCards(["8", "Jack", "Ace", "7", "Joker"]);
         while (true)
         {
             Deck.TurnCard();
             Card? card = GetFaceUp();
-            if (card == null)
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                throw new Exception("You shouldn't be here without a card!\nPanic!!!");
-            }
-            if (SpecialCards.TryGetValue(card.Rank, out IEffect? effect) && effect != null)
+
+            if (card != null && SpecialCards.TryGetValue(card.Rank, out IEffect? effect) && effect != null)
             {
                 Deck.Reset();
                 Deck.Shuffle();
             }
             else
             {
+                NotifyFaceUp(card);
                 break;
             }
         }
+
         Round = round;
+        NotifyPlayerTurn();
     }
 
-    public void ProgressGame(Card? playerChoice)
+    public async Task ProgressGame(Card? playerChoice)
     {
         /*    Manages the turn-based logic of the game, allowing each player to take their turn.
               Applies any special card effects if a special card is played.
              Checks game conditions (e.g., if a player has exhausted all their cards).
              Determines if the round has ended and prepares for the next round if needed.*/
         Player currentPlayer = Players[Turn];
-        if (playerChoice == null)
-        {
-            currentPlayer.PickCards(Deck, 1);
-            SetNext();
-            Console.Clear();
-            return;
-        }
-
-        Card? faceUp = GetFaceUp();
-        if (faceUp == null) return;
-        bool isValidMove = (SpecialCards.TryGetValue(playerChoice.Rank, out IEffect? cardEffect) && cardEffect != null) || //special
-                           RequiredSuit == playerChoice.Suit || // matches required
-                           string.IsNullOrEmpty(RequiredSuit) && (playerChoice.Suit == faceUp.Suit || playerChoice.Rank //matches face up
-            == faceUp.Rank);
-        if (Attacks > 0)
-        {
-            if (cardEffect is not AttackEffect)
-            {
-                isValidMove = false;
-                currentPlayer.PickCards(Deck, 2 * Attacks);
-                Attacks = 0;
-            }
-        }
-        else if (!isValidMove)
-        {
-            currentPlayer.PickCards(Deck, 2);
-        }
-        else if (!string.IsNullOrEmpty(RequiredSuit)) RequiredSuit = string.Empty;
-        if (isValidMove)
-        {
-            Deck.AddCard(playerChoice);
-            if (currentPlayer.Hand == null)
-                return;// TODO: handle exception
-            Card[] playerCards = currentPlayer.Hand.Where(card => card != playerChoice).ToArray();
-            Players[Turn].Hand = playerCards;
-            ApplySpecialCard(playerChoice.Rank);
-        }
+        if (await ValidateChoice(playerChoice) == false) return;
         SetNext();
         if (!currentPlayer.HasCards())
         {
             Bench.Add(currentPlayer);
-            List<Player> temp = new(Players);
+            List<Player> temp = [..Players];
             temp.Remove(currentPlayer);
             Players = temp.ToArray();
             if (Players.Length == 1)
@@ -118,27 +185,135 @@ public class Game
                 Out.Add(Players[0]);
                 Round++;
                 if (Round >= TotalRounds)
-                    EndGame();
-                StartGame(Round);
+                {
+                    Out.Reverse();
+                    List<Player> results = [..Bench, ..Out];
+                    EndGame(results);
+                } else
+                {
+                    StartGame(Round);
+                }
             }
         }
-        Console.Clear();
+    }
+
+    /// <summary>
+    /// Validates the player's choice of card to play.
+    /// If the choice is null, the player draws cards from the deck.
+    /// If the choice is a valid card, it is played and any special effects are applied.
+    /// If the choice is invalid, the player draws cards as a penalty.
+    /// </summary>
+    /// <param name="playerChoice"></param>
+    /// <returns></returns>
+    private async Task<bool> ValidateChoice(Card? playerChoice)
+    {
+        Player currentPlayer = Players[Turn];
+        if (playerChoice == null)
+        {
+            if (Attacks > 0)
+            {
+                currentPlayer.PickCards(Deck, 2 * Attacks);
+                Attacks = 0;
+                return true;
+            }
+
+            currentPlayer.PickCards(Deck, 1);
+            return true;
+        }
+
+        Card? faceUp = GetFaceUp();
+        if (faceUp == null) return false;
+        // TODO: find out why players don't get penalised if they play invalid card on top of a joker
+        bool isValidMove = (SpecialCards.TryGetValue(playerChoice.Rank, out IEffect? cardEffect) && cardEffect is
+                           {
+                               Immune: true
+                           }) || // immune special
+                           RequiredSuit == playerChoice.Suit || // matches required
+                           string.IsNullOrEmpty(RequiredSuit) &&
+                           (playerChoice.Suit == faceUp.Suit || // matches suit
+                            playerChoice.Rank == faceUp.Rank); // matches rank
+        Console.WriteLine("Is player choice a call effect? " + (cardEffect is CallEffect));
+        Console.WriteLine("Player's choice: " + playerChoice.Rank);
+        Console.WriteLine("Face up card: " + faceUp.Rank);
+        Console.WriteLine("Required suit: " + RequiredSuit);
+        if (Attacks > 0)
+        {
+            if (cardEffect is not AttackEffect)
+            {
+                currentPlayer.PickCards(Deck, 2 * Attacks);
+                Attacks = 0;
+                return false;
+            }
+            else
+                isValidMove = true;
+        }
+        else if (!isValidMove)
+        {
+            if (Attacks == 0)
+            {
+                isValidMove = true; // TODO: Investigate as to why this is needed (might need a `faceUp.Effect is AttackEffect`)
+            }
+            else
+            {
+                currentPlayer.PickCards(Deck, 2);
+                return true;
+            }
+        }
+        else if (!string.IsNullOrEmpty(RequiredSuit) && cardEffect is not CallEffect) RequiredSuit = string.Empty;
+
+        if (!isValidMove && cardEffect is not AttackEffect) return false;
+        Deck.AddCard(playerChoice);
+        if (currentPlayer.Hand == null)
+            return false;
+        Card[] playerCards = currentPlayer.Hand.Where(card => card != playerChoice).ToArray();
+        Players[Turn].Hand = playerCards;
+        await ApplySpecialCard(playerChoice.Rank);
+        NotifyFaceUp();
+        return true;
+    }
+
+    public void AddPlayer(Player player)
+    {
+        if (Players.Contains(player)) return;
+        Player[] players = Players;
+        Array.Resize(ref players, players.Length + 1);
+        players[^1] = player;
+        Players = players;
+    }
+
+    public Player[] GetPlayers()
+    {
+        return Players;
     }
 
     public Card? GetFaceUp()
     {
-        return Deck.FaceUp.Count > 0 ? Deck.FaceUp[^1] : null;
-    }
-
-    private void EndGame()
-    {
-        Console.WriteLine($"THE GAME HAS ENDED!\nWINNER: {Players[0].Name}");
-        for (int i = 0; i < Out.Count; i++)
+        Card? card = null;
+        if (Deck is { FaceUp.Count: > 0 })
         {
-            Console.WriteLine($"Rank: {i + 2} => {Out[i].Name}");
+            card = Deck.FaceUp[^1];
         }
 
-        Console.WriteLine("THANK YOU FOR PLAYING!!");
+        return card;
+    }
+
+    /// <summary>
+    /// Ends the game and notifies all players of the results.
+    /// </summary>
+    /// <param name="results">
+    /// Ordered list of players who finished the game.
+    /// </param>
+    private void EndGame(List<Player> results)
+    {
+        IsRunning = false;
+        GameHasEnded?.Invoke(results);
+        // Console.WriteLine($"THE GAME HAS ENDED!\nWINNER: {Players[0]}");
+        // for (int i = 0; i < Out.Count; i++)
+        // {
+        //     Console.WriteLine($"Rank: {i + 2} => {Out[i]}");
+        // }
+        //
+        // Console.WriteLine("THANK YOU FOR PLAYING!!");
     }
 
     private void DealCards(int count)
@@ -146,29 +321,26 @@ public class Game
         foreach (Player player in Players)
         {
             player.Hand = Deck.DealCards(count);
+            _ = Deck.VibeCheck(Players, "DEAL CARDS");
         }
     }
-    
+
     private void DealCards(string[] ranks)
     {
+        //TODO: find out why we dealing more cards than needed => resolved
+        //Resolution: StartGame was called by each player, leading to card miscount
         foreach (Player player in Players)
         {
             player.Hand = Deck.DealCards(ranks);
         }
     }
 
-    private void ApplySpecialCard(string cardRank)
+    private async Task ApplySpecialCard(string cardRank)
     {
         bool directionBefore = Clockwise;
         if (!SpecialCards.TryGetValue(cardRank, out IEffect? effect) || effect == null) return;
-        effect.Execute(this);
+        await effect.Execute(this);
         _pivot = directionBefore != Clockwise;
-            
-        // Add effect to active effects if not single-turn
-        if (effect.Frequency != EffectFrequency.SingleTurn)
-        {
-            ActiveEffects.Add(effect);
-        }
     }
 
     private void SetNext()
@@ -177,8 +349,10 @@ public class Game
         if (n == 2 && _pivot)
         {
             _pivot = false;
+            NotifyPlayerTurn();
             return;
         }
+
         if (Clockwise)
         {
             Turn = (Turn + Step + n) % n;
@@ -187,8 +361,21 @@ public class Game
         {
             Turn = (Turn + n - Step) % n;
         }
+
         // reset to default
         Step = 1;
         _pivot = false;
+        NotifyPlayerTurn();
+    }
+
+    private void NotifyPlayerTurn()
+    {
+        string currentPlayerId = Players[Turn].PlayerId;
+        PlayerTurnChanged?.Invoke(currentPlayerId);
+    }
+
+    private void NotifyFaceUp(Card? card = null)
+    {
+        FaceUpCardChanged?.Invoke(card ?? GetFaceUp() ?? new Card() { Rank = "Unknown", Suit = "Unknown" });
     }
 }

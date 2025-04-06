@@ -5,7 +5,7 @@ namespace Crazy8;
 
 class Program
 {
-    static void Main(string[] args)
+    static async Task Main(string[] args)
     {
         Player[] players = new[]
         {
@@ -29,7 +29,7 @@ class Program
                 ? $"{faceUp.Rank} of {faceUp.Suit}"
                 : game.RequiredSuit;
             Console.WriteLine($"Face up card is: {sFaceUp}");
-            game.ProgressGame(currentPlayer.PlayCard());
+            await game.ProgressGame(currentPlayer.PlayCard());
         }
     }
 }

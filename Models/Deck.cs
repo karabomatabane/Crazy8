@@ -2,37 +2,53 @@
 
 namespace Crazy8.Models;
 
-public class Deck
+public sealed class Deck
 {
     private List<Card> FaceDown { get; set; }
+    public event EventHandler<VibeCheckEventArgs> VibeCheckEvent = null!;
     public List<Card> FaceUp { get; set; }
-    private static Random random = new Random(); 
+    private static readonly Random Random = new Random();
+    private readonly int _size;
 
     public Deck(int size = 52)
     {
         FaceDown = new List<Card>();
         FaceUp = new List<Card>();
+        _size = size;
         foreach (string suit in Const.Suits)
         {
             foreach (string rank in Const.Ranks)
             {
-                FaceDown.Add(new Card(){Suit = suit, Rank = rank});
+                FaceDown.Add(new Card()
+                {
+                    Suit = suit, Rank = rank, Image = $"assets/cards/{rank.ToLower()}_of_{suit.ToLower()}.png"
+                });
             }
         }
-        FaceDown.Add(new Card(){Suit = "Red", Rank = "Joker"});
-        FaceDown.Add(new Card(){Suit = "Black", Rank = "Joker"});
+
+        FaceDown.Add(new Card()
+        {
+            Suit = "Red", Rank = "Joker", Image = $"assets/cards/red_joker.png"
+        });
+        FaceDown.Add(new Card()
+        {
+            Suit = "Black", Rank = "Joker", Image = $"assets/cards/black_joker.png"
+        });
     }
 
-    /// <summary>
-    /// Shuffle the face-down cards
-    /// </summary>
+    public int GetCount()
+    {
+        return FaceDown.Count;
+    }
+
     public void Shuffle()
     {
         // Fisher–Yates shuffle
         int n = FaceDown.Count;
-        while (n > 1) {  
-            n--;  
-            int k = random.Next(n + 1);  
+        while (n > 1)
+        {
+            n--;
+            int k = Random.Next(n + 1);
             // val at pos n becomes value at pos n and vice-versa
             (FaceDown[k], FaceDown[n]) = (FaceDown[n], FaceDown[k]);
         }
@@ -46,12 +62,11 @@ public class Deck
             FaceDown.RemoveAt(0);
         }
         else
-        { 
+        {
             // take all the face up cards except the last one
             FaceDown = FaceUp.Take(FaceUp.Count - 1).ToList();
             // shuffle the deck
             Shuffle();
-            TurnCard();
         }
     }
 
@@ -59,8 +74,12 @@ public class Deck
     {
         if (FaceDown.Contains(card) || FaceUp.Contains(card))
         {
-            throw new Exception("You cannot have a card that already exists in the deck!\nPanic!!!");
+            // throw new Exception("You cannot have a card that already exists in the deck!\nPanic!!!");
+            VibeCheckEventArgs args = new("You cannot have a card that already exists in the deck!") 
+                { Card = card };
+            OnVibeCheckEvent(args);
         }
+
         FaceUp.Add(card);
     }
 
@@ -75,7 +94,7 @@ public class Deck
         FaceDown.RemoveRange(0, count);
         return cards;
     }
-    
+
     /// <summary>
     /// Deal specific cards
     /// </summary>
@@ -89,17 +108,30 @@ public class Deck
     private Card? GetCard(string rank)
     {
         Card? card = FaceDown.FirstOrDefault(card => card.Rank == rank);
-        int position = card != null ? FaceDown.IndexOf(card) : -1;
-        if (position != -1)
-        {
-            FaceDown.RemoveAt(position);
-        }
+        if (card != null) FaceDown.Remove(card);
         return card;
     }
 
     /// <summary>
-    /// Turn all the face-up cards face down 
+    /// Checks the distribution of cards across the game.
     /// </summary>
+    /// <returns>True if cards are consistent, and false if universe is fucked.</returns>
+    public bool VibeCheck(Player[] players, string invoker)
+    {
+        // Count cards
+        int playersHands = 0;
+        foreach (Player player in players)
+        {
+            if (player.Hand == null) continue;
+            playersHands += player.Hand.Length;
+        }
+        int totalCards = FaceDown.Count + FaceUp.Count + playersHands;
+        if (totalCards == _size) return true;
+        OnVibeCheckEvent(new 
+            VibeCheckEventArgs($"The universe is fucked. Check {invoker} to find out what happened."));
+        return false;
+    }
+
     public void Reset()
     {
         foreach (Card card in FaceUp.ToList())
@@ -107,5 +139,16 @@ public class Deck
             FaceDown.Add(card);
             FaceUp.Remove(card);
         }
+    }
+    
+    public class VibeCheckEventArgs(string reason) : EventArgs
+    {
+        public string Reason { get; set; } = reason;
+        public Card? Card { get; set; }
+    }
+
+    private void OnVibeCheckEvent(VibeCheckEventArgs e)
+    {
+        VibeCheckEvent.Invoke(this, e);
     }
 }
